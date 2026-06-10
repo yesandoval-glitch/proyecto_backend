@@ -1,5 +1,4 @@
 <?php
-
 namespace App\Controllers;
 
 use App\Models\Empleado;
@@ -8,232 +7,130 @@ use Psr\Http\Message\ServerRequestInterface as Request;
 
 class EmpleadoController
 {
-    // -------------------------------------------------------
-    // GET /empleados
-    // -------------------------------------------------------
-    public function index(Request $request, Response $response): Response
+    private function json(Response $response, $data, int $status = 200): Response
     {
-        $params     = $request->getQueryParams();
-        $query      = Empleado::query()->orderBy('nombres');
+        $response->getBody()->write(json_encode($data));
+        return $response->withHeader('Content-Type', 'application/json')->withStatus($status);
+    }
+
+    // GET /empleados
+    public function listar(Request $request, Response $response): Response
+    {
+        $params    = $request->getQueryParams();
+        $query     = Empleado::query();
 
         if (!empty($params['documento'])) {
-            $query->porDocumento($params['documento']);
+            $query->where('documento', 'like', '%' . $params['documento'] . '%');
         }
-
         if (!empty($params['area'])) {
-            $query->porArea($params['area']);
+            $query->where('area', $params['area']);
         }
-
         if (!empty($params['estado'])) {
-            $query->porEstado($params['estado']);
+            $query->where('estado', $params['estado']);
         }
 
-        $empleados = $query->get();
-
-        return $this->jsonResponse($response, [
-            'success' => true,
-            'data'    => $empleados,
-            'total'   => $empleados->count(),
-        ], 200);
+        return $this->json($response, $query->get());
     }
 
-    // -------------------------------------------------------
     // GET /empleados/{id}
-    // -------------------------------------------------------
-    public function show(Request $request, Response $response, array $args): Response
+    public function obtener(Request $request, Response $response, array $args): Response
     {
-        $empleado = Empleado::find((int) $args['id']);
-
+        $empleado = Empleado::find($args['id']);
         if (!$empleado) {
-            return $this->jsonResponse($response, [
-                'success' => false,
-                'message' => 'Empleado no encontrado.',
-            ], 404);
+            return $this->json($response, ['error' => 'Empleado no encontrado'], 404);
         }
-
-        return $this->jsonResponse($response, [
-            'success' => true,
-            'data'    => $empleado,
-        ], 200);
+        return $this->json($response, $empleado);
     }
 
-    // -------------------------------------------------------
     // POST /empleados
-    // -------------------------------------------------------
-    public function store(Request $request, Response $response): Response
+    public function crear(Request $request, Response $response): Response
     {
-        $body   = $request->getParsedBody();
-        $errores = $this->validarCamposObligatorios($body);
+        $data = $request->getParsedBody();
 
-        if (!empty($errores)) {
-            return $this->jsonResponse($response, [
-                'success' => false,
-                'message' => 'Errores de validacion.',
-                'errores' => $errores,
-            ], 422);
+        $requeridos = ['nombres', 'apellidos', 'documento', 'correo', 'telefono', 'cargo', 'area', 'fecha_ingreso'];
+        foreach ($requeridos as $campo) {
+            if (empty($data[$campo])) {
+                return $this->json($response, ['error' => "El campo $campo es requerido"], 400);
+            }
         }
 
-        if (Empleado::documentoExiste($body['documento'])) {
-            return $this->jsonResponse($response, [
-                'success' => false,
-                'message' => "El documento '{$body['documento']}' ya esta registrado.",
-            ], 409);
+        if (Empleado::where('documento', $data['documento'])->exists()) {
+            return $this->json($response, ['error' => 'El documento ya esta registrado'], 400);
+        }
+        if (Empleado::where('correo', $data['correo'])->exists()) {
+            return $this->json($response, ['error' => 'El correo ya esta registrado'], 400);
         }
 
-        if (Empleado::correoExiste($body['correo'])) {
-            return $this->jsonResponse($response, [
-                'success' => false,
-                'message' => "El correo '{$body['correo']}' ya esta registrado.",
-            ], 409);
-        }
-
-        if (!$this->fechaValida($body['fecha_ingreso'])) {
-            return $this->jsonResponse($response, [
-                'success' => false,
-                'message' => 'La fecha de ingreso no es valida.',
-            ], 422);
+        $fecha = \DateTime::createFromFormat('Y-m-d', $data['fecha_ingreso']);
+        if (!$fecha) {
+            return $this->json($response, ['error' => 'Fecha de ingreso invalida, use formato YYYY-MM-DD'], 400);
         }
 
         $empleado = Empleado::create([
-            'nombres'      => trim($body['nombres']),
-            'apellidos'    => trim($body['apellidos']),
-            'documento'    => trim($body['documento']),
-            'correo'       => strtolower(trim($body['correo'])),
-            'telefono'     => trim($body['telefono']),
-            'cargo'        => trim($body['cargo']),
-            'area'         => trim($body['area']),
-            'fecha_ingreso'=> $body['fecha_ingreso'],
-            'estado'       => 'activo',
+            'nombres'      => $data['nombres'],
+            'apellidos'    => $data['apellidos'],
+            'documento'    => $data['documento'],
+            'correo'       => $data['correo'],
+            'telefono'     => $data['telefono'],
+            'cargo'        => $data['cargo'],
+            'area'         => $data['area'],
+            'fecha_ingreso'=> $data['fecha_ingreso'],
+            'estado'       => 'activo'
         ]);
 
-        return $this->jsonResponse($response, [
-            'success' => true,
-            'message' => 'Empleado creado correctamente.',
-            'data'    => $empleado,
-        ], 201);
+        return $this->json($response, ['mensaje' => 'Empleado creado correctamente', 'empleado' => $empleado], 201);
     }
 
-    // -------------------------------------------------------
     // PUT /empleados/{id}
-    // -------------------------------------------------------
-    public function update(Request $request, Response $response, array $args): Response
+    public function actualizar(Request $request, Response $response, array $args): Response
     {
-        $empleado = Empleado::find((int) $args['id']);
-
+        $empleado = Empleado::find($args['id']);
         if (!$empleado) {
-            return $this->jsonResponse($response, [
-                'success' => false,
-                'message' => 'Empleado no encontrado.',
-            ], 404);
+            return $this->json($response, ['error' => 'Empleado no encontrado'], 404);
         }
 
-        $body = $request->getParsedBody();
+        $data = $request->getParsedBody();
 
-        // Validar documento unico (excluyendo el actual)
-        if (!empty($body['documento']) && Empleado::documentoExiste($body['documento'], $empleado->id)) {
-            return $this->jsonResponse($response, [
-                'success' => false,
-                'message' => "El documento '{$body['documento']}' ya esta registrado.",
-            ], 409);
+        if (!empty($data['documento']) && $data['documento'] !== $empleado->documento) {
+            if (Empleado::where('documento', $data['documento'])->exists()) {
+                return $this->json($response, ['error' => 'El documento ya esta registrado'], 400);
+            }
+        }
+        if (!empty($data['correo']) && $data['correo'] !== $empleado->correo) {
+            if (Empleado::where('correo', $data['correo'])->exists()) {
+                return $this->json($response, ['error' => 'El correo ya esta registrado'], 400);
+            }
         }
 
-        // Validar correo unico (excluyendo el actual)
-        if (!empty($body['correo']) && Empleado::correoExiste($body['correo'], $empleado->id)) {
-            return $this->jsonResponse($response, [
-                'success' => false,
-                'message' => "El correo '{$body['correo']}' ya esta registrado.",
-            ], 409);
-        }
-
-        if (!empty($body['fecha_ingreso']) && !$this->fechaValida($body['fecha_ingreso'])) {
-            return $this->jsonResponse($response, [
-                'success' => false,
-                'message' => 'La fecha de ingreso no es valida.',
-            ], 422);
-        }
-
-        $camposActualizables = ['nombres', 'apellidos', 'documento', 'correo', 'telefono', 'cargo', 'area', 'fecha_ingreso', 'estado'];
-        foreach ($camposActualizables as $campo) {
-            if (isset($body[$campo])) {
-                $empleado->$campo = trim($body[$campo]);
+        $campos = ['nombres', 'apellidos', 'documento', 'correo', 'telefono', 'cargo', 'area', 'fecha_ingreso', 'estado'];
+        foreach ($campos as $campo) {
+            if (isset($data[$campo])) {
+                $empleado->$campo = $data[$campo];
             }
         }
         $empleado->save();
 
-        return $this->jsonResponse($response, [
-            'success' => true,
-            'message' => 'Empleado actualizado correctamente.',
-            'data'    => $empleado,
-        ], 200);
+        return $this->json($response, ['mensaje' => 'Empleado actualizado correctamente', 'empleado' => $empleado]);
     }
 
-    // -------------------------------------------------------
     // PATCH /empleados/{id}/estado
-    // -------------------------------------------------------
     public function cambiarEstado(Request $request, Response $response, array $args): Response
     {
-        $empleado = Empleado::find((int) $args['id']);
-
+        $empleado = Empleado::find($args['id']);
         if (!$empleado) {
-            return $this->jsonResponse($response, [
-                'success' => false,
-                'message' => 'Empleado no encontrado.',
-            ], 404);
+            return $this->json($response, ['error' => 'Empleado no encontrado'], 404);
         }
 
-        $body   = $request->getParsedBody();
-        $estado = $body['estado'] ?? '';
+        $data   = $request->getParsedBody();
+        $estado = $data['estado'] ?? '';
 
-        if (!in_array($estado, ['activo', 'inactivo'], true)) {
-            return $this->jsonResponse($response, [
-                'success' => false,
-                'message' => 'Estado invalido. Valores permitidos: activo, inactivo.',
-            ], 422);
+        if (!in_array($estado, ['activo', 'inactivo'])) {
+            return $this->json($response, ['error' => 'Estado invalido, use: activo o inactivo'], 400);
         }
 
-        try {
-            $empleado->cambiarEstado($estado);
-        } catch (\InvalidArgumentException $e) {
-            return $this->jsonResponse($response, [
-                'success' => false,
-                'message' => $e->getMessage(),
-            ], 422);
-        }
+        $empleado->estado = $estado;
+        $empleado->save();
 
-        return $this->jsonResponse($response, [
-            'success' => true,
-            'message' => "Estado del empleado actualizado a '{$estado}'.",
-            'data'    => $empleado,
-        ], 200);
-    }
-
-    // -------------------------------------------------------
-    // Helpers privados
-    // -------------------------------------------------------
-
-    private function validarCamposObligatorios(array $body): array
-    {
-        $requeridos = ['nombres', 'apellidos', 'documento', 'correo', 'telefono', 'cargo', 'area', 'fecha_ingreso'];
-        $errores    = [];
-        foreach ($requeridos as $campo) {
-            if (empty($body[$campo])) {
-                $errores[] = "El campo '{$campo}' es obligatorio.";
-            }
-        }
-        return $errores;
-    }
-
-    private function fechaValida(string $fecha): bool
-    {
-        $d = \DateTime::createFromFormat('Y-m-d', $fecha);
-        return $d && $d->format('Y-m-d') === $fecha;
-    }
-
-    private function jsonResponse(Response $response, array $data, int $status): Response
-    {
-        $response->getBody()->write(json_encode($data, JSON_UNESCAPED_UNICODE));
-        return $response
-            ->withHeader('Content-Type', 'application/json')
-            ->withStatus($status);
+        return $this->json($response, ['mensaje' => 'Estado actualizado correctamente', 'empleado' => $empleado]);
     }
 }

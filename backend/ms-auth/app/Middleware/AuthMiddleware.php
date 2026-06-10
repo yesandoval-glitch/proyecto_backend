@@ -1,51 +1,25 @@
 <?php
-
 namespace App\Middleware;
 
 use App\Models\Usuario;
 use Psr\Http\Message\ResponseInterface as Response;
 use Psr\Http\Message\ServerRequestInterface as Request;
-use Psr\Http\Server\MiddlewareInterface;
 use Psr\Http\Server\RequestHandlerInterface as Handler;
 use Slim\Psr7\Response as SlimResponse;
 
-class AuthMiddleware implements MiddlewareInterface
+class AuthMiddleware
 {
-    public function process(Request $request, Handler $handler): Response
+    public function __invoke(Request $request, Handler $handler): Response
     {
-        $header = $request->getHeaderLine('Authorization');
-        $token  = null;
-
-        if (str_starts_with($header, 'Bearer ')) {
-            $token = trim(substr($header, 7));
-        }
-
-        if (!$token) {
-            return $this->unauthorized('Token no proporcionado.');
-        }
-
-        $usuario = Usuario::buscarPorToken($token);
+        $token   = $request->getHeaderLine('Authorization');
+        $usuario = Usuario::where('token', $token)->where('sesion_activa', true)->first();
 
         if (!$usuario) {
-            return $this->unauthorized('Token invalido o sesion inactiva.');
+            $response = new SlimResponse();
+            $response->getBody()->write(json_encode(['error' => 'No autorizado']));
+            return $response->withHeader('Content-Type', 'application/json')->withStatus(401);
         }
 
-        // Inyecta el usuario autenticado en los atributos del request
-        $request = $request->withAttribute('usuario_autenticado', $usuario);
-
         return $handler->handle($request);
-    }
-
-    private function unauthorized(string $mensaje): Response
-    {
-        $response = new SlimResponse();
-        $response->getBody()->write(json_encode([
-            'success' => false,
-            'message' => $mensaje,
-        ], JSON_UNESCAPED_UNICODE));
-
-        return $response
-            ->withHeader('Content-Type', 'application/json')
-            ->withStatus(401);
     }
 }

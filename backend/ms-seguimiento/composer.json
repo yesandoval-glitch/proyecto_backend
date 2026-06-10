@@ -1,6 +1,6 @@
 {
-    "name": "corporate/ms-empleados",
-    "description": "Microservicio de empleados",
+    "name": "corporate/ms-seguimiento",
+    "description": "Microservicio de seguimiento de incapacidades",
     "require": {
         "slim/slim": "4.*",
         "slim/psr7": "*",

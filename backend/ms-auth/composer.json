@@ -1,12 +1,10 @@
 {
     "name": "corporate/ms-auth",
-    "description": "Microservicio de autenticacion - Corporate Solutions",
-    "type": "project",
+    "description": "Microservicio de autenticacion",
     "require": {
-        "php": "^8.0",
-        "slim/slim": "^4.0",
-        "slim/psr7": "^1.0",
-        "illuminate/database": "^10.0",
+        "slim/slim": "4.*",
+        "slim/psr7": "*",
+        "illuminate/database": "*",
         "vlucas/phpdotenv": "^5.0"
     },
     "autoload": {

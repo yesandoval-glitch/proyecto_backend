@@ -18,11 +18,10 @@ class AuthMiddleware
             return $response->withHeader('Content-Type', 'application/json')->withStatus(401);
         }
 
-        // Validar token contra ms-auth
         $ch = curl_init('http://localhost:8081/auth/validar');
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
         curl_setopt($ch, CURLOPT_HTTPHEADER, ["Authorization: $token"]);
-        $result = curl_exec($ch);
+        curl_exec($ch);
         $status = curl_getinfo($ch, CURLINFO_HTTP_CODE);
         curl_close($ch);
 

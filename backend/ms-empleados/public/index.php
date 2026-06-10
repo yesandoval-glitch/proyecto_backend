@@ -1,22 +1,32 @@
 <?php
+require __DIR__ . '/../vendor/autoload.php';
 
-declare(strict_types=1);
-
-require_once __DIR__ . '/../vendor/autoload.php';
-
-use App\Config\Database;
-use App\Middleware\CorsMiddleware;
 use Slim\Factory\AppFactory;
+use Dotenv\Dotenv;
+use Illuminate\Database\Capsule\Manager as Capsule;
 
-Database::getInstance();
+$dotenv = Dotenv::createImmutable(__DIR__ . '/..');
+$dotenv->load();
+
+$capsule = new Capsule;
+$capsule->addConnection([
+    'driver'    => 'mysql',
+    'host'      => $_ENV['DB_HOST'],
+    'database'  => $_ENV['DB_NAME'],
+    'username'  => $_ENV['DB_USER'],
+    'password'  => $_ENV['DB_PASS'],
+    'port'      => $_ENV['DB_PORT'],
+    'charset'   => 'utf8',
+    'collation' => 'utf8_unicode_ci',
+]);
+$capsule->setAsGlobal();
+$capsule->bootEloquent();
 
 $app = AppFactory::create();
-
-$app->add(CorsMiddleware::class);
 $app->addBodyParsingMiddleware();
+$app->addRoutingMiddleware();
 $app->addErrorMiddleware(true, true, true);
 
-$registerRoutes = require __DIR__ . '/../app/Routes/routes.php';
-$registerRoutes($app);
+require __DIR__ . '/../app/Routes/routes.php';
 
 $app->run();
