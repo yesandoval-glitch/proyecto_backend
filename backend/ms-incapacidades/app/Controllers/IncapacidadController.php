@@ -24,32 +24,20 @@ class IncapacidadController
         return $status === 200;
     }
 
-    // GET /incapacidades
     public function listar(Request $request, Response $response): Response
     {
         $params = $request->getQueryParams();
         $query  = Incapacidad::query();
 
-        if (!empty($params['empleado_id'])) {
-            $query->where('empleado_id', $params['empleado_id']);
-        }
-        if (!empty($params['tipo'])) {
-            $query->where('tipo', $params['tipo']);
-        }
-        if (!empty($params['estado'])) {
-            $query->where('estado', $params['estado']);
-        }
-        if (!empty($params['fecha_inicio'])) {
-            $query->where('fecha_inicio', '>=', $params['fecha_inicio']);
-        }
-        if (!empty($params['fecha_fin'])) {
-            $query->where('fecha_fin', '<=', $params['fecha_fin']);
-        }
+        if (!empty($params['empleado_id'])) $query->where('empleado_id', $params['empleado_id']);
+        if (!empty($params['tipo']))        $query->where('tipo', $params['tipo']);
+        if (!empty($params['estado']))      $query->where('estado', $params['estado']);
+        if (!empty($params['fecha_inicio'])) $query->where('fecha_inicio', '>=', $params['fecha_inicio']);
+        if (!empty($params['fecha_fin']))    $query->where('fecha_fin', '<=', $params['fecha_fin']);
 
         return $this->json($response, $query->orderBy('fecha_inicio', 'desc')->get());
     }
 
-    // GET /incapacidades/{id}
     public function obtener(Request $request, Response $response, array $args): Response
     {
         $incapacidad = Incapacidad::find($args['id']);
@@ -59,20 +47,19 @@ class IncapacidadController
         return $this->json($response, $incapacidad);
     }
 
-    // POST /incapacidades
     public function crear(Request $request, Response $response): Response
     {
-        $data = $request->getParsedBody();
+        $data  = $request->getParsedBody();
         $token = $request->getHeaderLine('Authorization');
 
-        $requeridos = ['empleado_id', 'tipo', 'diagnostico', 'fecha_inicio', 'fecha_fin', 'entidad'];
+        $requeridos = ['empleado_id', 'fecha_inicio', 'fecha_fin', 'tipo', 'diagnostico_general', 'entidad_medica'];
         foreach ($requeridos as $campo) {
             if (empty($data[$campo])) {
                 return $this->json($response, ['error' => "El campo $campo es requerido"], 400);
             }
         }
 
-        $tiposValidos = ['enfermedad_general', 'accidente_trabajo', 'enfermedad_laboral', 'maternidad', 'paternidad'];
+        $tiposValidos = ['enfermedad_general', 'accidente_laboral', 'licencia_medica', 'incapacidad_temporal'];
         if (!in_array($data['tipo'], $tiposValidos)) {
             return $this->json($response, ['error' => 'Tipo de incapacidad invalido'], 400);
         }
@@ -90,21 +77,20 @@ class IncapacidadController
         }
 
         $incapacidad = Incapacidad::create([
-            'empleado_id'   => $data['empleado_id'],
-            'tipo'          => $data['tipo'],
-            'diagnostico'   => $data['diagnostico'],
-            'fecha_inicio'  => $data['fecha_inicio'],
-            'fecha_fin'     => $data['fecha_fin'],
-            'dias'          => $dias,
-            'entidad'       => $data['entidad'],
-            'estado'        => 'registrada',
-            'observaciones' => $data['observaciones'] ?? null
+            'empleado_id'        => $data['empleado_id'],
+            'fecha_inicio'       => $data['fecha_inicio'],
+            'fecha_fin'          => $data['fecha_fin'],
+            'tipo'               => $data['tipo'],
+            'diagnostico_general'=> $data['diagnostico_general'],
+            'entidad_medica'     => $data['entidad_medica'],
+            'observaciones'      => $data['observaciones'] ?? null,
+            'dias_incapacidad'   => $dias,
+            'estado'             => 'registrada'
         ]);
 
         return $this->json($response, ['mensaje' => 'Incapacidad registrada correctamente', 'incapacidad' => $incapacidad], 201);
     }
 
-    // PUT /incapacidades/{id}
     public function actualizar(Request $request, Response $response, array $args): Response
     {
         $incapacidad = Incapacidad::find($args['id']);
@@ -124,21 +110,18 @@ class IncapacidadController
             if ($fechaFin < $fechaInicio) {
                 return $this->json($response, ['error' => 'La fecha fin no puede ser menor a la fecha inicio'], 400);
             }
-            $data['dias'] = $fechaInicio->diff($fechaFin)->days + 1;
+            $data['dias_incapacidad'] = $fechaInicio->diff($fechaFin)->days + 1;
         }
 
-        $campos = ['tipo', 'diagnostico', 'fecha_inicio', 'fecha_fin', 'dias', 'entidad', 'observaciones'];
+        $campos = ['fecha_inicio', 'fecha_fin', 'tipo', 'diagnostico_general', 'entidad_medica', 'observaciones', 'dias_incapacidad'];
         foreach ($campos as $campo) {
-            if (isset($data[$campo])) {
-                $incapacidad->$campo = $data[$campo];
-            }
+            if (isset($data[$campo])) $incapacidad->$campo = $data[$campo];
         }
         $incapacidad->save();
 
         return $this->json($response, ['mensaje' => 'Incapacidad actualizada correctamente', 'incapacidad' => $incapacidad]);
     }
 
-    // PATCH /incapacidades/{id}/estado
     public function cambiarEstado(Request $request, Response $response, array $args): Response
     {
         $incapacidad = Incapacidad::find($args['id']);
@@ -149,15 +132,13 @@ class IncapacidadController
         $data   = $request->getParsedBody();
         $estado = $data['estado'] ?? '';
 
-        $estadosValidos = ['registrada', 'en_proceso', 'aprobada', 'rechazada'];
+        $estadosValidos = ['registrada', 'en_revision', 'aprobada', 'rechazada', 'finalizada'];
         if (!in_array($estado, $estadosValidos)) {
-            return $this->json($response, ['error' => 'Estado invalido. Use: registrada, en_proceso, aprobada, rechazada'], 400);
+            return $this->json($response, ['error' => 'Estado invalido. Use: registrada, en_revision, aprobada, rechazada, finalizada'], 400);
         }
 
         $incapacidad->estado = $estado;
-        if (!empty($data['observaciones'])) {
-            $incapacidad->observaciones = $data['observaciones'];
-        }
+        if (!empty($data['observaciones'])) $incapacidad->observaciones = $data['observaciones'];
         $incapacidad->save();
 
         return $this->json($response, ['mensaje' => 'Estado actualizado correctamente', 'incapacidad' => $incapacidad]);

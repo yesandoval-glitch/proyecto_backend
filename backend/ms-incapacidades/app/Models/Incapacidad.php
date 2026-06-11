@@ -9,13 +9,13 @@ class Incapacidad extends Model
 
     protected $fillable = [
         'empleado_id',
-        'tipo',
-        'diagnostico',
         'fecha_inicio',
         'fecha_fin',
-        'dias',
-        'entidad',
-        'estado',
-        'observaciones'
+        'tipo',
+        'diagnostico_general',
+        'entidad_medica',
+        'observaciones',
+        'dias_incapacidad',
+        'estado'
     ];
 }

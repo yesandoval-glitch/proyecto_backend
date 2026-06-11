@@ -9,12 +9,9 @@ class Seguimiento extends Model
 
     protected $fillable = [
         'incapacidad_id',
-        'empleado_id',
-        'usuario_id',
-        'accion',
-        'estado_anterior',
-        'estado_nuevo',
-        'observaciones',
-        'fecha_accion'
+        'fecha',
+        'comentario',
+        'estado',
+        'usuario_responsable'
     ];
 }
