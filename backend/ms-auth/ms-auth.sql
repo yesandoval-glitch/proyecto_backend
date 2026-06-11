@@ -1,3 +1,6 @@
+CREATE DATABASE ms_auth;
+USE ms_auth;
+
 CREATE TABLE usuarios (
     id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     nombre VARCHAR(100) NOT NULL,
@@ -12,40 +15,6 @@ CREATE TABLE usuarios (
     updated_at TIMESTAMP NULL DEFAULT NULL
 );
 
-INSERT INTO usuarios (
-    nombre,
-    correo,
-    usuario,
-    contrasena,
-    rol,
-    token,
-    sesion_activa,
-    estado,
-    created_at,
-    updated_at
-)
-VALUES
-(
-    'Administrador General',
-    'admin@empresa.com',
-    'admin',
-    'admin123',
-    'administrador',
-    NULL,
-    FALSE,
-    'activo',
-    NOW(),
-    NOW()
-),
-(
-    'Analista Gestion Humana',
-    'gh@empresa.com',
-    'gestionhumana',
-    'gh123',
-    'gestion_humana',
-    NULL,
-    FALSE,
-    'activo',
-    NOW(),
-    NOW()
-);
+INSERT INTO usuarios (nombre, correo, usuario, contrasena, rol, token, sesion_activa, estado, created_at, updated_at) VALUES
+('Administrador General', 'admin@empresa.com', 'admin', 'admin123', 'administrador', NULL, FALSE, 'activo', NOW(), NOW()),
+('Analista Gestion Humana', 'gh@empresa.com', 'gestionhumana', 'gh123', 'gestion_humana', NULL, FALSE, 'activo', NOW(), NOW());
