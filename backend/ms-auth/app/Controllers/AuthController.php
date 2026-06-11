@@ -29,6 +29,7 @@ class AuthController
 
         $token = bin2hex(random_bytes(32));
         $usuario->token        = $token;
+        $usuario->sesion_activa = true;
         $usuario->save();
 
         $response->getBody()->write(json_encode([
